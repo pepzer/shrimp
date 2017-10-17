@@ -1,6 +1,6 @@
 #!/bin/bash
 
-":"; exec lumo --socket-repl 12345 -c ../libs/redlobster-0.2.2-SNAPSHOT.jar:src/cljs:src/clj:test/cljs -K -i "$0" -r
+":"; exec lumo --socket-repl 12345 -D org.clojars.pepzer/redlobster:0.2.2 -c src/cljs:src/clj:test/cljs -K -i "$0" -r
 
 (ns repl.run
  (:require [shrimp.core]))
