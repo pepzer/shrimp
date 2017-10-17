@@ -1,0 +1,8 @@
+#!/bin/bash
+
+":"; exec lumo --socket-repl 12345 -c ../libs/redlobster-0.2.2-SNAPSHOT.jar:src/cljs:src/clj:test/cljs -K -i "$0" -r
+
+(ns repl.run
+ (:require [shrimp.core]))
+
+(println "\nNamespace shrimp.core loaded,\nswitch to it with (in-ns 'shrimp.core).\n")
