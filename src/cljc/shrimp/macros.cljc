@@ -32,7 +32,8 @@
   "
   [bindings & forms]
   (if (odd? (count bindings))
-    `(throw (js/Error. "Defer-loop needs an even number of binding clauses!"))
+    #?(:clj (throw (Exception. "Defer-loop needs an even number of binding clauses!"))
+       :cljs (throw (js/Error. "Defer-loop needs an even number of binding clauses!")))
     (let [pairs (partition 2 bindings)
           symbols (mapv first pairs)
           args (map second pairs)

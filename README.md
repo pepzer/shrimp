@@ -4,7 +4,7 @@ Shrimp is a [ClojureScript](https://clojurescript.org/) library that implements 
 It targets [Node.js](https://nodejs.org/en/) and [Lumo](https://github.com/anmonteiro/lumo) with the aim to be lightweight and to offer in addition useful functionalities for testing async functions.  
 Shrimp is *not* meant to replace [core.async](https://github.com/clojure/core.async) on these platforms, there is no plan to offer the same functionalities and no attempt to hide the underlying promise API.  
 
-Almost all operations on channels in Shrimp return a Red Lobster's promise that could be managed with functions and macros from the same library.  
+Almost all operations on channels in Shrimp return a Red Lobster promise that could be managed with functions and macros from the same library.  
 In addition Shrimp offers an async supporting loop macro, and there is also [Shrimp-Chain](https://github.com/pepzer/shrimp-chain), a collection of macros built on top of Shrimp providing a unified way to manage multiple async operations returning promises intertwined with synchronous ones.
 
 ## Rationale

@@ -3,16 +3,18 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-(ns shrimp.test.macros)
+(ns shrimp.test.macros
+  #?(:cljs (:require [shrimp.test]))
+  #?(:cljs (:use-macros [redlobster.macros :only [when-realised]])))
 
-(def r-when-realised 'redlobster.macros/when-realised)
-(def t-init! 'shrimp.test/init!)
-(def t-close! 'shrimp.test/close!)
-(def t-reset! 'shrimp.test/reset-collection!)
-(def t-tests-done 'shrimp.test/tests-done)
-(def t-collect 'shrimp.test/collect-results!)
-(def t-report-counter! 'shrimp.test/inc-report-counter!)
-(def t-orig-inc-report 'cljs.test/inc-report-counter!)
+(def ^:private r-when-realised 'redlobster.macros/when-realised)
+(def ^:private t-init! 'shrimp.test/init!)
+(def ^:private t-close! 'shrimp.test/close!)
+(def ^:private t-reset! 'shrimp.test/reset-collection!)
+(def ^:private t-tests-done 'shrimp.test/tests-done)
+(def ^:private t-collect 'shrimp.test/collect-results!)
+(def ^:private t-report-counter! 'shrimp.test/inc-report-counter!)
+(def ^:private t-orig-inc-report 'cljs.test/inc-report-counter!)
 
 (defn- realise-form [in-form ns]
   `(do

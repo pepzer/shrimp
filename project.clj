@@ -1,4 +1,4 @@
-(defproject shrimp "0.1.0"
+(defproject shrimp "0.1.1-SNAPSHOT"
   :description "A ClojureScript library targeting Node.js and providing async channels on top of Red Lobster promise library."
   :url "https://github.com/pepzer/shrimp"
   :license {:name "Mozilla Public License Version 2.0"
@@ -15,11 +15,11 @@
 
   :clean-targets ^{:protect false} ["target"]
 
-  :source-paths ["src/clj" "src/cljs" "test/cljs"]
+  :source-paths ["src/cljc" "src/cljs" "test/cljs"]
 
   :cljsbuild {
               :builds [{:id "dev"
-                        :source-paths ["src/clj" "src/cljs"]
+                        :source-paths ["src/cljc" "src/cljs"]
                         :figwheel true
                         :compiler {:main shrimp.dev
                                    :output-to "target/out/shrimp.js"
@@ -28,15 +28,15 @@
                                    :optimizations :none
                                    :source-map true }}
                        {:id "test-all"
-                        :source-paths ["src/clj" "src/cljs" "test/cljs"]
+                        :source-paths ["src/cljc" "src/cljs" "test/cljs"]
                         :compiler {:main shrimp.tests
                                    :output-to "target/out-test/shrimp.js"
                                    :output-dir "target/out-test"
                                    :target :nodejs
                                    :optimizations :none
                                    :source-map true }}
-                       {:id "prod"
-                        :source-paths ["src/clj" "src/cljs"]
+                       #_{:id "prod"
+                        :source-paths ["src/cljc" "src/cljs"]
                         :compiler {:output-to "target/out-rel/shrimp.js"
                                    :output-dir "target/out-rel"
                                    :target :nodejs
