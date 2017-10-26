@@ -2,7 +2,15 @@
 
 ":"; exec lumo --socket-repl 12345 -D org.clojars.pepzer/redlobster:0.2.2 -c src/cljs:src/cljc:test/cljs -K -i "$0" -r
 
-(ns repl.run
- (:require [shrimp.core]))
+(ns cljs.user
+ (:require [redlobster.promise :as p]
+           [shrimp.core :as sc])
+ (:use-macros [redlobster.macros :only [let-realised when-realised]]
+              [shrimp.macros :only [defer defer-loop]]))
 
-(println "\nNamespace shrimp.core loaded,\nswitch to it with (in-ns 'shrimp.core).\n")
+(println "\nNamespace loaded with:\n
+(ns cljs.user
+ (:require [redlobster.promise :as p]
+           [shrimp.core :as sc])
+ (:use-macros [redlobster.macros :only [let-realised when-realised]]
+              [shrimp.macros :only [defer defer-loop]]))\n")

@@ -53,21 +53,24 @@
     [this]
     [this tag prom])
   (-closed? [this])
-  (-dead? [this]))
+  (-dead? [this])
+  (-set-buffer-size! [this buff]))
 
 (let [atom? #(instance? Atom %)
       prom-inside? #(p/promise? (deref %))
       nil-inside? #(nil? (deref %))
       symbol-inside? #(symbol? (deref %))
       queue-inside? #(instance? cljs.core/PersistentQueue (deref %))
-      bool-inside? #(boolean? (deref %))]
+      bool-inside? #(boolean? (deref %))
+      pos-int-inside? #(and (int? (deref %))
+                            (pos? (deref %)))]
 
   (s/def ::chan-id symbol?)
   (s/def ::chan-transformer fn?)
   (s/def ::poll-interval int?)
   (s/def ::take-ready (s/and atom? prom-inside?))
   (s/def ::put-ready (s/and atom? prom-inside?))
-  (s/def ::buffer-size (s/and int? pos?))
+  (s/def ::buffer-size (s/and atom? pos-int-inside?))
   (s/def ::chan-lock (s/and atom? (s/or :nil-in nil-inside?
                                         :sym-in symbol-inside?)))
   (s/def ::put-promises (s/and atom? queue-inside?))
@@ -126,7 +129,11 @@ until these promises gets realised by puts and takes.
   (-closed? [this]
     (deref (:is-closed? this)))
   (-dead? [this]
-    (deref (:is-dead? this))))
+    (deref (:is-dead? this)))
+  (-set-buffer-size! [this buff]
+    (when (and (number? buff)
+               (pos? buff))
+      (reset! (:buffer-size this) buff))))
 
 (def ^:private empty-queue (.-EMPTY cljs.core/PersistentQueue))
 
@@ -171,9 +178,9 @@ until these promises gets realised by puts and takes.
                        :take-ready (atom (p/promise))
                        :put-ready (atom (p/promise))
                        :buffer-size (or (and (number? buffer-size)
-                                             (> buffer-size 0)
-                                             buffer-size)
-                                        1024)
+                                             (pos? buffer-size)
+                                             (atom buffer-size))
+                                        (atom 1024))
                        :chan-lock (atom nil)
                        :put-promises (atom empty-queue)
                        :take-promises (atom empty-queue)
@@ -185,14 +192,34 @@ until these promises gets realised by puts and takes.
      (chan-loop c)
      c)))
 
+(defn chan?
+  "Test if ch is a valid shrimp channel."
+  [ch]
+  (instance? Chan ch))
+
+(defn set-buffer-size!
+  "Modify the buffer-size of a channel after creation.
+
+  It does not affect what is already queued on the channel.
+  Next put! or take! operations will have to respect the new buffer limit.
+
+  :param ch
+    The shrimp channel.
+
+  :param buffer-size
+    The new buffer-size, must be a positive integer.
+  "
+  [ch buffer-size]
+  (-set-buffer-size! ch buffer-size))
+
 (defn- chan-or-throw
   "Throw an exception if the argument isn't a valid shrimp channel.
 
-  :param chan
+  :param ch
     The shrimp channel.
   "
-  [chan]
-  (when-not (instance? Chan chan)
+  [ch]
+  (when-not (instance? Chan ch)
     (throw (js/Error. "Error: invalid shrimp channel!"))))
 
 (defn closed?
@@ -202,11 +229,11 @@ until these promises gets realised by puts and takes.
   after the last value is taken it switches to dead.
   Put operations are refused on a closed channel and realise immediately to false.
 
-  :param chan
+  :param ch
     The shrimp channel.
   "
-  [chan]
-  (-closed? chan))
+  [ch]
+  (-closed? ch))
 
 (defn dead?
   "Return true if the channel is dead, false otherwise.
@@ -215,21 +242,23 @@ until these promises gets realised by puts and takes.
   is useless, the loop is stopped, put operations immediately realise to false,
   take operations immediately realise to nil.
 
-  :param chan
+  :param ch
     The shrimp channel.
   "
-  [chan]
-  (-dead? chan))
+  [ch]
+  (-dead? ch))
 
 (defn- close-takes!
   "Switch a channel to dead after the values queue has been emptied.
 
   All remaining take or alts promises are realised to nil.
   "
-  [{:keys [take-promises
+  [{:keys [take-ready
+           take-promises
            next-take-promise
            alts-cb-promise
            is-dead?]}]
+  (try-realise @take-ready nil)
   (if (p/promise? @next-take-promise)
     (try-realise @next-take-promise nil))
   (reset! next-take-promise nil)
@@ -281,8 +310,8 @@ until these promises gets realised by puts and takes.
 
   Retry if the channel is busy.
   "
-  [chan]
-  (-close! chan))
+  [ch]
+  (-close! ch))
 
 (defn- swap-take-promises!
   "Advance the take promises queue, handle the case of an alts! promise.
@@ -316,7 +345,7 @@ until these promises gets realised by puts and takes.
   take.
   This is an helper function invoked by chan-loop, it could recur to itself once.
 
-  :param chan
+  :param ch
     The shrimp channel.
   :param tag
     A symbol that has been used to acquire the lock.
@@ -372,29 +401,29 @@ until these promises gets realised by puts and takes.
   If the channel is closed and the values queue is empty call close-takes! and
   terminate the loop.
 
-  :param chan
+  :param ch
     The shrimp channel.
 
   :param tag
     A symbol used to acquire the lock, if absent is generated randomly.
   "
-  ([chan] (chan-loop chan (gensym "chan-loop")))
+  ([ch] (chan-loop ch (gensym "chan-loop")))
   ([{:keys [is-closed?
             take-ready
             put-ready
             values-queue
-            poll-interval] :as chan} tag]
+            poll-interval] :as ch} tag]
    (let [empty-values? (< (count @values-queue) 1)]
      (if (and @is-closed? empty-values?)
-       (close-takes! chan)
+       (close-takes! ch)
        (when-realised [@put-ready]
          (if (and @is-closed? empty-values?)
-           (close-takes! chan)
+           (close-takes! ch)
            (when-realised [@take-ready]
-             (let [lock (:chan-lock chan)]
+             (let [lock (:chan-lock ch)]
                (if (= tag (swap! lock #(or %1 %2) tag))
-                 (chan-loop-do! chan tag)
-                 (defer poll-interval (chan-loop chan tag)))))))))))
+                 (chan-loop-do! ch tag)
+                 (defer poll-interval (chan-loop ch tag)))))))))))
 
 (defn- put-do!
   "Perform the put! operation on the channel.
@@ -406,8 +435,8 @@ until these promises gets realised by puts and takes.
            buffer-size
            put-ready
            put-promises
-           values-queue] :as chan} value tag prom]
-  (if (>= (count @values-queue) buffer-size)
+           values-queue]} value tag prom]
+  (if (>= (count @values-queue) @buffer-size)
     (p/realise prom false)
     (do
       (try-realise @put-ready true)
@@ -438,7 +467,7 @@ until these promises gets realised by puts and takes.
   If the channel is closed after the put! but before a take!, the return promise
   will be realised to 'nil'.
 
-  :param chan
+  :param ch
     The shrimp channel.
 
   :param value
@@ -447,7 +476,7 @@ until these promises gets realised by puts and takes.
   :return
     A callback promise realised after a take or on failure.
   "
-  ([chan value] (-put! chan value)))
+  ([ch value] (-put! ch value)))
 
 (defn- take-do!
   "Perform the take! operation on the channel.
@@ -462,7 +491,7 @@ until these promises gets realised by puts and takes.
            values-queue
            buffer-size]} tag prom]
 
-  (if (>= (count @take-promises) buffer-size)
+  (if (>= (count @take-promises) @buffer-size)
     (p/realise prom nil)
     (if @next-take-promise
       (swap! take-promises conj prom)
@@ -491,7 +520,7 @@ until these promises gets realised by puts and takes.
   The return promise is placed on the channel and realised as soon as a value is
   available and this promise is the first in the queue.
 
-  :param chan
+  :param ch
     The shrimp channel.
 
   :param tag
@@ -500,7 +529,7 @@ until these promises gets realised by puts and takes.
   :return
     A promise realised to a value from the channel or 'nil' on failure.
   "
-  ([chan] (-take! chan)))
+  ([ch] (-take! ch)))
 
 (defn timeout
   "Create a timeout and return a promise that is realised on expiration.
@@ -548,7 +577,7 @@ until these promises gets realised by puts and takes.
            alts-cb-promise
            buffer-size]} tag cb-prom res-prom]
 
-  (if (>= (count @take-promises) buffer-size)
+  (if (>= (count @take-promises) @buffer-size)
     (do
       (p/realise cb-prom nil)
       (p/realise res-prom nil))
@@ -581,7 +610,7 @@ until these promises gets realised by puts and takes.
   If 'ttime' is provided start a timer with delay 'ttime' that will realise the
   alts! promise to '[tvalue :expired]', 'tvalue' defaults to 'nil' if absent.
 
-  :param chans
+  :param channels
     A seq of shrimp channels.
 
   :param ttime
@@ -595,12 +624,12 @@ until these promises gets realised by puts and takes.
     or '[tvalue :expired]' if ttime was defined and no channel had a value to
     take before the expiration.
   "
-  ([chans] (alts! chans nil nil))
-  ([chans ttime] (alts! chans ttime nil))
-  ([chans ttime tvalue]
-   (let [dtoll (for [chan chans]
-                 (do (chan-or-throw chan)
-                     (deref (:is-dead? chan))))]
+  ([channels] (alts! channels nil nil))
+  ([channels ttime] (alts! channels ttime nil))
+  ([channels ttime tvalue]
+   (let [dtoll (for [ch channels]
+                 (do (chan-or-throw ch)
+                     (deref (:is-dead? ch))))]
 
      (if (some true? dtoll)
        (p/promise [nil :dead])
@@ -621,7 +650,7 @@ until these promises gets realised by puts and takes.
              realised-err (fn [value]
                             (try-realise cb-prom true)
                             (try-realise-error res-prom value))
-             proms (doall (map #(-alts! % cb-prom) chans))]
+             proms (doall (map #(-alts! % cb-prom) channels))]
 
          (doseq [alts-prom proms]
            (p/on-realised alts-prom
