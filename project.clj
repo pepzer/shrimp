@@ -6,9 +6,7 @@
 
   :min-lein-version "2.7.1"
 
-  :dependencies [[org.clojure/clojure "1.9.0-beta1"]
-                 [org.clojure/clojurescript "1.9.946"]
-                 [org.clojars.pepzer/redlobster "0.2.2"]]
+  :dependencies [[org.clojars.pepzer/redlobster "0.2.2"]]
 
   :plugins [[lein-figwheel "0.5.13"]
             [lein-cljsbuild "1.1.7" :exclusions [[org.clojure/clojure]]]]
@@ -17,7 +15,7 @@
 
   :source-paths ["src/cljc" "src/cljs" "test/cljs"]
 
-  :cljsbuild {
+  :cljsbuild {:test-commands {"node" ["node" "target/out-test/shrimp.js"]}
               :builds [{:id "dev"
                         :source-paths ["src/cljc" "src/cljs"]
                         :figwheel true
@@ -43,6 +41,8 @@
                                    :optimizations :advanced
                                    :source-map false }}]}
 
-  :profiles {:dev {:source-paths ["dev"]}}
+  :profiles {:dev {:source-paths ["dev"]
+                   :dependencies [[org.clojure/clojurescript "1.9.946"]
+                                  [org.clojure/clojure "1.9.0-beta1"]]}}
   :figwheel {})
 

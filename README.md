@@ -17,12 +17,12 @@ If you use [Leiningen](https://github.com/technomancy/leiningen) add redlobster 
 ```clojure
 :dependencies [... 
                [org.clojars.pepzer/redlobster "0.2.2"]
-               [shrimp "0.1.0"]]
+               [shrimp "0.1.1-SNAPSHOT"]]
 ```
     
 For Lumo you could either download the dependencies with Leiningen/Maven and specify the libraries on the CLI this way:
 
-    $ lumo -D org.clojars.pepzer/redlobster:0.2.2,shrimp:0.1.0
+    $ lumo -D org.clojars.pepzer/redlobster:0.2.2,shrimp:0.1.1-SNAPSHOT
     
 Or you could download the jar files and add them to Lumo classpath:
 
@@ -273,8 +273,7 @@ Ran 4 tests containing 4 assertions.
 To run the tests with Leiningen use:
 
 ```
-$ lein cljsbuild once
-$ node target/out-test/shrimp.js
+$ lein cljsbuild test
 ```
 
 With Lumo:
