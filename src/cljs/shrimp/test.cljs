@@ -43,10 +43,11 @@
           {:tests 0 :pass 0
            :fail 0 :error 0}))
 
-(defn close! []
-  (println "\nAll namespaces:")
-  (print-results! (swap! all-tests-data
-                         #(merge-with + % @one-test-data)))
+(defn close! [print-all?]
+  (when print-all?
+    (println "\nAll namespaces:")
+    (print-results! (swap! all-tests-data
+                           #(merge-with + % @one-test-data))))
   (sp/close! @test-ch))
 
 (defn- test-complete! []

@@ -32,7 +32,8 @@
 (defmacro run-async-tests
   [& forms]
   (let [orig-rep-fn (gensym "orig-fn")
-        end-form `(do (~t-close!)
+        print-all? (> (count forms) 1)
+        end-form `(do (~t-close! ~print-all?)
                       (set! ~t-orig-inc-report ~orig-rep-fn))
         chained (realise-forms forms end-form)]
     `(let [~orig-rep-fn ~t-orig-inc-report]
