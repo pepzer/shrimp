@@ -3,7 +3,13 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-(ns shrimp.macros)
+(ns shrimp.macros
+  #?(:cljs (:require [redlobster.promise]))
+  #?(:cljs (:use-macros [redlobster.macros :only [let-realised]])))
+
+(def ^:private r-promise 'redlobster.promise/promise)
+(def ^:private realise 'redlobster.promise/realise)
+(def ^:private let-realised 'redlobster.macros/let-realised)
 
 (defmacro defer
   "Run the given forms in the next tick of the event loop or after a delay.
@@ -24,35 +30,54 @@
        (js/setTimeout fn# (max ~delay 0)))))
 
 (defmacro defer-loop
-  "Equivalent to loop but use setImmediate and defer-recur for recursion.
+  "Imitate loop but allow async blocks returning promises inside the loop.
 
-  Accept bindings and recur without consuming stack using setImmediate,
-  needs a call to 'defer-recur' for recursion.
-  Useful when using 'let-realised', 'when-realised' and similar inside the loop.
+  When `defer-recur` is called recur with `js/setImmediate` or `js/setTimeout`.
+  When [`:delay` value] is in the bindings recur with `js/setTimeout` and value.
+  Useful when using `let-realised`, `when-realised` and similar inside the loop.
   "
   [bindings & forms]
   (if (odd? (count bindings))
-    #?(:clj (throw (Exception. "Defer-loop needs an even number of binding clauses!"))
-       :cljs (throw (js/Error. "Defer-loop needs an even number of binding clauses!")))
-    (let [pairs (partition 2 bindings)
-          symbols (mapv first pairs)
-          args (map second pairs)
-          fn-sym (gensym "defer-loop-")
-          defer-recur (symbol "defer-recur")]
-      `(do
-         (defn- ~fn-sym
-           ~symbols
-           (let [t# (.-setImmediate js/global)
-                 ~defer-recur (if t#
-                                (fn [& args#]
-                                  (js/setImmediate
-                                   (fn [] (apply ~fn-sym args#))))
-                                (fn [& args#]
-                                  (js/setTimeout
-                                   (fn [] (apply ~fn-sym args#))
-                                   0)))]
-             ~@forms))
-         (~fn-sym ~@args)))))
+    #?(:clj (throw (Exception. "defer-loop: odd number of args in bindings!"))
+       :cljs (throw (js/Error. "defer-loop: odd number of args in bindings!")))
+    (let [special? #{:delay}
+          dispatch (fn [[symbols args specials] [sym value]]
+                     (if (special? sym)
+                       [symbols args (assoc specials sym value)]
+                       [(conj symbols sym) (conj args value) specials]))
+          [symbols args specials] (reduce dispatch [[] [] {}]
+                                          (partition 2 bindings))
+          delay (:delay specials)
+          recur-args (gensym "recur-args-")
+          tram-fn (gensym "tram-fn-")
+          defer-form (or (and delay
+                              (int? delay)
+                              (pos? delay)
+                              `(js/setTimeout (fn []
+                                                (~tram-fn ~tram-fn ~recur-args))
+                                              ~delay))
+                         `(js/setImmediate (fn []
+                                             (~tram-fn ~tram-fn ~recur-args))))]
+      `(let [return-prom# (~r-promise)
+             defer-recur# (fn [& args#]
+                            {:defer-recur-args args#})
+             body-fn# (fn ~symbols
+                        (let [~(symbol "defer-recur") defer-recur#]
+                          (~r-promise (do ~@forms))))
+             trampoline# (fn [tram-fn# recur-args#]
+                           (~let-realised [cycle-prom# (apply body-fn#
+                                                              recur-args#)]
+                            (if (and (map? (deref cycle-prom#))
+                                     (contains? (deref cycle-prom#)
+                                                :defer-recur-args))
+                              (let [~recur-args (:defer-recur-args
+                                                 (deref cycle-prom#))
+                                    ~tram-fn tram-fn#]
+                                ~defer-form)
+                              (~realise return-prom# (deref cycle-prom#)))))]
+         (js/setImmediate (fn []
+                            (trampoline# trampoline# ~args)))
+         return-prom#))))
 
 (defmacro defer-time
   "Async version of cljs.core/time, run expr and return its value.

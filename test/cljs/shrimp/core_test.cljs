@@ -85,7 +85,6 @@
 (deftest take-loop-test
   (let [n 1000
         chan (sc/chan (* n 2))
-        end (p/promise)
         r (range n)]
     (doseq [i r]
       (put! chan i))
@@ -93,13 +92,11 @@
 
     (is (s/valid? :shrimp.core/chan chan) "take-loop spec #1")
 
-    (defer-loop [chan chan acc [] end end]
-      (if (sc/dead? chan)
-        (p/realise end acc)
-        (let-realised [prom (take! chan)]
-          (defer-recur chan (conj acc @prom) end))))
-
-    (when-realised [end]
+    (let-realised [end (defer-loop [acc []]
+                          (if (sc/dead? chan)
+                            acc
+                            (let-realised [prom (take! chan)]
+                              (defer-recur (conj acc @prom)))))]
       ;; end could contain a nil at the end
       (is (= r (take n @end)) "take-loop acc")
       (let-realised [prom (take! chan)]

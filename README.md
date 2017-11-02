@@ -53,6 +53,8 @@ With Lumo installed just run the lumo-repl.cljsh script:
 This will run the REPL and will also listen on the port 12345 of the localhost for connections.  
 You could connect with Emacs and inf-clojure-connect.
 
+The examples from this readme could be evaluated in the REPL easily by opening the file `repl_session.cljs`.
+
 ## Usage
 
 To use shrimp, require the shrimp.core namespace, and create a channnel:
@@ -105,7 +107,7 @@ Require Red Lobster macros with use-macros to manage the channel promises:
                                         ; Put a value inside the channnel
 (sc/put! chan1 "foo")
 
-=> Val: foo
+;; => Val: foo
 ```
 
 ### alts!
@@ -132,18 +134,20 @@ There is an alts! function to take from the first available channel with an opti
                                         ; Put a value inside the channnel
 (sc/put! chan1 "foo")
 
-=> Val: foo , from chan1
+;; => Val: foo , from chan1
 ```
 
 To define a timeout of 1 second and a default value on expiration:
 
 ```clojure
-(ps/alts! [chan1 chan2] 1000 "default value")
+(sc/alts! [chan1 chan2] 1000 "default value")
 ```
 
 ### defer-loop
 
-This macro mimics Clojure's loop, but it allows to use asynchronous functions inside the loop:
+This macro mimics Clojure's loop, but it allows to use async code returning promises inside the loop.  
+`defer-loop` does not consume the stack and does not define global vars, it allows the keyword `:delay` in the bindings followed by a value (in milliseconds) that will be used to defer the recursion.  
+`defer-loop` returns a promise realised to the exit value of the loop.
 
 ```clojure
 (require '[shrimp.core :as sc])
@@ -154,11 +158,11 @@ This macro mimics Clojure's loop, but it allows to use asynchronous functions in
 (def chan1 (sc/chan))
 
                                         ; The loop stops when the take! promise realises to nil
-(defer-loop [prom (sc/take! chan1)]
+(defer-loop [prom (sc/take! chan1) :delay 100]
   (when-realised [prom]
     (if @prom
       (do
-        (println "Val: " @prom ", from defer-loop")
+        (println "Val:" @prom ", from defer-loop")
 
                                         ; defer-recur works like recur
                                         ; It is only defined under the scope of the defer-loop macro
@@ -168,11 +172,13 @@ This macro mimics Clojure's loop, but it allows to use asynchronous functions in
 
                                         ; Put a value inside the channnel
 (sc/put! chan1 "foo")
+(sc/put! chan1 "bar")
 
 (sc/close! chan1)
 
-=> Val: foo , from defer-loop
-Exit from the loop
+;; => Val: foo , from defer-loop
+;; => Val: bar , from defer-loop
+;; => Exit from the loop
 ```
 
 
@@ -190,7 +196,7 @@ Compared to Red Lobster, this version always requires the integer value for the 
 
 (defer 2000 (println "foo"))
 
-=> foo
+;; => foo
 ```
 
 ### defer-time
@@ -204,9 +210,9 @@ This small macro allows to easily print the elapsed time for an asynchronous fun
   (defer 2000 (do (println "foo")
                   (do-time (println "bar")))))
 
-=> foo
-bar
-"Elapsed time: 2003.601113 msecs"
+;; => foo
+;; => bar
+;; => "Elapsed time: 2003.601113 msecs"
 ```
 
 ### Testing asynchronous functions
