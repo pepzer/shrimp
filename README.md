@@ -199,6 +199,25 @@ Compared to Red Lobster, this version always requires the integer value for the 
 ;; => foo
 ```
 
+### realise-time
+
+This macro takes an expression returning a redlobster promise and prints the elapsed time once the promise is realised.  
+`realise-time` returns a promise realised to the same value as the wrapped expression:
+
+```clojure
+(use-macros '[shrimp.macros :only [realise-time defer-loop]])
+
+(realise-time
+  (defer-loop [x 0 :delay 100]
+    (if (< x 10)
+      (defer-recur (inc x))
+      (println "x:" x))))
+
+;; => #object[redlobster.promise.Promise]
+;; => x: 10
+;; => "Elapsed time: 1006.799804 msecs"
+```
+
 ### defer-time
 
 This small macro allows to easily print the elapsed time for an asynchronous function. The function do-time is defined inside the scope of the macro, it should be called as the last expression in the asynchronous block (or as a wrapper for it):

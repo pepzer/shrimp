@@ -46,7 +46,7 @@
 
 ;; => Val: foo , from chan1
 
-(use-macros '[shrimp.macros :only [defer-loop defer defer-time]])
+(use-macros '[shrimp.macros :only [defer-loop defer realise-time defer-time]])
 
 
                                         ; Define the channel
@@ -75,22 +75,19 @@
 ;; => Val: bar , from defer-loop
 ;; => Exit from the loop
 
-(defer-time
-  (defer-loop [[x & xs] (range 3) :delay 2000]
-    (when x
-      (do-time (println "x:" x))
-      (defer-recur xs))))
-
-;; => x: 0
-;; => "Elapsed time: 2.302183 msecs"
-;; => x: 1
-;; => "Elapsed time: 2005.525582 msecs"
-;; => x: 2
-;; => "Elapsed time: 4008.374148 msecs"
-
 (defer 2000 (println "foo"))
 
 ;; => foo
+
+(realise-time
+ (defer-loop [x 0 :delay 100]
+   (if (< x 10)
+     (defer-recur (inc x))
+     (println "x:" x))))
+
+;; => #object[redlobster.promise.Promise]
+;; => x: 10
+;; => "Elapsed time: 1006.799804 msecs"
 
 (defer-time
   (defer 2000 (do (println "foo")

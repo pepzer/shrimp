@@ -5,11 +5,12 @@
 
 (ns shrimp.macros
   #?(:cljs (:require [redlobster.promise]))
-  #?(:cljs (:use-macros [redlobster.macros :only [let-realised]])))
+  #?(:cljs (:use-macros [redlobster.macros :only [let-realised when-realised]])))
 
 (def ^:private r-promise 'redlobster.promise/promise)
 (def ^:private realise 'redlobster.promise/realise)
 (def ^:private let-realised 'redlobster.macros/let-realised)
+(def ^:private when-realised 'redlobster.macros/when-realised)
 
 (defmacro defer
   "Run the given forms in the next tick of the event loop or after a delay.
@@ -79,6 +80,25 @@
                             (trampoline# trampoline# ~args)))
          return-prom#))))
 
+(defmacro realise-time
+  "Variant of cljs.core/time that prints the time elapsed until realisation.
+
+  Wrap an expr returning a promise and print the elapsed time on realisation.
+  Return a promise with the same value as the promise returned by expr.
+  "
+  [expr]
+  `(let [start# (system-time)
+         do-time# (fn [& res#]
+                    (prn (cljs.core/str "Elapsed time: "
+                                        (.toFixed (- (system-time) start#) 6)
+                                        " msecs"))
+                    (first res#))
+         return-prom# (~r-promise ~expr)]
+     (js/setImmediate (fn []
+                        (~when-realised [return-prom#]
+                         (do-time#))))
+     return-prom#))
+
 (defmacro defer-time
   "Async version of cljs.core/time, run expr and return its value.
 
@@ -90,10 +110,10 @@
   "
   [expr]
   `(let [start# (system-time)
-         do-time# (fn [& res#]
-                    (prn (cljs.core/str "Elapsed time: "
-                                        (.toFixed (- (system-time) start#) 6)
-                                        " msecs"))
-                    (first res#))
-         ~(symbol "do-time") do-time#]
+         ~(symbol "do-time") (fn [& res#]
+                               (prn (cljs.core/str
+                                     "Elapsed time: "
+                                     (.toFixed (- (system-time) start#) 6)
+                                     " msecs"))
+                               (first res#))]
      ~expr))
